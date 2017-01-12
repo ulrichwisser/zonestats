@@ -11,12 +11,12 @@ import (
 	"sync"
 
 	"github.com/miekg/dns"
-	"github.com/ulrichwisser/zonestat/inputs/axfr"
-	"github.com/ulrichwisser/zonestat/inputs/zonefile"
-	"github.com/ulrichwisser/zonestat/plugins/countdom"
-	"github.com/ulrichwisser/zonestat/plugins/countrr"
-	"github.com/ulrichwisser/zonestat/plugins/dnssec"
-	"github.com/ulrichwisser/zonestat/plugins/nsstats"
+	"github.com/ulrichwisser/zonestats/inputs/axfr"
+	"github.com/ulrichwisser/zonestats/inputs/zonefile"
+	"github.com/ulrichwisser/zonestats/plugins/countdom"
+	"github.com/ulrichwisser/zonestats/plugins/countrr"
+	"github.com/ulrichwisser/zonestats/plugins/dnssec"
+	"github.com/ulrichwisser/zonestats/plugins/nsstats"
 )
 
 type Plugin interface {
