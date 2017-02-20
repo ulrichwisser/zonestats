@@ -103,15 +103,6 @@ func (self *DNSSEC) Done() {
 	}
 }
 
-func (self *DNSSEC) Stats() {
-	for alg := range self.CountDS {
-		for digest := range self.CountDS[alg] {
-			fmt.Printf("Dnssec\t%-25s\t%-10s\t%d\n", AlgorithmName(alg), DigestTypeName(digest), self.CountDS[alg][digest])
-		}
-	}
-	fmt.Printf("CountSigned\t%d\n", len(self.measurement))
-}
-
 func (self *DNSSEC) Influx(tld string, source string) string {
 	line := ""
 	for alg := range self.CountDS {
