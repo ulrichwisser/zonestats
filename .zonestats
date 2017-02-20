@@ -1,0 +1,8 @@
+resolvers: 
+  - 172.21.36.10
+influxserver: 127.0.0.1
+influxport: 8086
+influxdb: auto
+influxuser: ulrich
+influxpasswd: apa
+

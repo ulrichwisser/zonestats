@@ -2,10 +2,12 @@ package nsstats
 
 import (
 	"fmt"
-	"math/rand"
 	"sync"
 
 	"github.com/miekg/dns"
+	"github.com/ulrichwisser/zonestats/dnsresolver"
+	"github.com/ulrichwisser/zonestats/hostlist"
+	"github.com/ulrichwisser/zonestats/iplist"
 )
 
 type statsType uint
@@ -20,44 +22,50 @@ const (
 	InTldGlueIpMissmatch statsType = 6
 	ExTld                statsType = 7
 	ExTldNoIp            statsType = 8
+
+	IpEdns0        statsType = 21
+	IpNoEdns0      statsType = 22
+	IpNsid         statsType = 23
+	IpNoNsid       statsType = 24
+	IpDnscookies   statsType = 25
+	IpNoDnscookies statsType = 26
 )
 
+const STATS_SIZE = 30
+
 type Nsstat struct {
-	access    sync.Mutex
-	hostlist  Hostlist
-	resolvers []string
-	stats     map[statsType]uint
+	access   sync.Mutex
+	hostlist hostlist.Hostlist
+	iplist   iplist.IPlist
+	resolver *dnsresolver.Resolver
+	stats    map[statsType]uint
 }
 
-func Init(origin string, resolvers []string) *Nsstat {
+func Init(origin string, resolver *dnsresolver.Resolver) *Nsstat {
 	self := Nsstat{}
 	self.access = sync.Mutex{}
-	self.hostlist = Hostlist{}
+	self.hostlist = hostlist.Hostlist{}
 	self.hostlist.Init(origin)
-	self.resolvers = make([]string, 0)
-	if len(resolvers) > 0 {
-		for _, resolver := range resolvers {
-			self.resolvers = append(self.resolvers, ip2resolver(resolver))
-		}
-	} else {
-		self.resolvers = GetResolvers()
-	}
+	self.iplist = iplist.IPlist{}
+	self.iplist.Init()
+	self.resolver = resolver
 	return &self
 }
 
-func (self *Nsstat) GetIPs(host *Host, wg *sync.WaitGroup) {
+func (self *Nsstat) GetIPs(host *hostlist.Host, wg *sync.WaitGroup) {
 	defer wg.Done()
 	self.access.Lock()
-	resolver := self.resolvers[rand.Intn(len(self.resolvers))]
 	self.access.Unlock()
-	answer := resolv(host.GetName(), dns.TypeA, resolver)
-	answer = append(answer, resolv(host.GetName(), dns.TypeAAAA, resolver)...)
+	answer := self.resolver.Resolv(host.GetName(), dns.TypeA)
+	answer = append(answer, self.resolver.Resolv(host.GetName(), dns.TypeAAAA)...)
 	for _, answer := range answer {
 		if answer.Header().Rrtype == dns.TypeA {
 			host.AddIP(answer.(*dns.A).A)
+			self.iplist.AddIP(answer.(*dns.A).A, wg)
 		}
 		if answer.Header().Rrtype == dns.TypeAAAA {
 			host.AddIP(answer.(*dns.AAAA).AAAA)
+			self.iplist.AddIP(answer.(*dns.AAAA).AAAA, wg)
 		}
 	}
 }
@@ -86,6 +94,7 @@ func (self *Nsstat) Receive(rr dns.RR, wg *sync.WaitGroup) {
 		}
 		glue := rr.(*dns.A).A
 		host.AddGlue(glue)
+		self.iplist.AddIP(glue, wg)
 	case *dns.AAAA:
 		hostname := rr.Header().Name
 		host := self.hostlist.GetHost(hostname)
@@ -96,15 +105,12 @@ func (self *Nsstat) Receive(rr dns.RR, wg *sync.WaitGroup) {
 		}
 		glue := rr.(*dns.AAAA).AAAA
 		host.AddGlue(glue)
+		self.iplist.AddIP(glue, wg)
 	}
 }
 
-func (self *Nsstat) Done() {
-	// init stats
-	self.stats = make(map[statsType]uint, 9)
-
-	// compute stats
-	for _, host := range self.hostlist.list {
+func (self *Nsstat) HostStats() {
+	for _, host := range self.hostlist.List {
 		if host.IsTldHost {
 			self.stats[InTld]++
 			if len(host.Glue) > 0 {
@@ -169,13 +175,19 @@ func (self *Nsstat) Done() {
 	}
 }
 
-func (self *Nsstat) Stats() {
-	fmt.Printf("SE Hosts                                  %5d\n", self.stats[InTld])
-	fmt.Printf("SE Hosts no glue        / no ip :         %5d / %5d  (%5.1f)\n", self.stats[InTldNoGlue], self.stats[InTldNoGlueNoIp], (100.0 * float64(self.stats[InTldNoGlueNoIp]) / float64(self.stats[InTldNoGlue])))
-	fmt.Printf("SE Hosts    glue        / no ip :         %5d / %5d  (%5.1f)\n", self.stats[InTldGlue], self.stats[InTldGlueNoIp], (100.0 * float64(self.stats[InTldGlueNoIp]) / float64(self.stats[InTldGlue])))
-	fmt.Printf("SE Hosts    glue and ip / not matching :  %5d / %5d  (%5.1f)\n", self.stats[InTldGlueIp], self.stats[InTldGlueIpMissmatch], (100.0 * float64(self.stats[InTldGlueIpMissmatch]) / float64(self.stats[InTldGlueIp])))
-	fmt.Printf("EX Hosts                / no ip :         %5d / %5d  (%5.1f)\n", self.stats[ExTld], self.stats[ExTldNoIp], (100.0 * float64(self.stats[ExTldNoIp]) / float64(self.stats[ExTld])))
-	fmt.Println("")
+func (self *Nsstat) IpStats() {
+	for i, cap := range self.iplist.Results {
+		fmt.Printf("%3d: IP %-15s  EDNS0 %t COOKIES %t NSID %-15s BIND %-15s\n", i, cap.Ip.String(), cap.EDNS0, cap.DNSCookies, cap.NSID, cap.BINDVERSION)
+	}
+}
+
+func (self *Nsstat) Done() {
+	// init stats
+	self.stats = make(map[statsType]uint, STATS_SIZE)
+
+	// compute stats
+	self.HostStats()
+	self.IpStats()
 }
 
 func (self *Nsstat) Influx(tld string, source string) string {

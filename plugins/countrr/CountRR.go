@@ -37,12 +37,6 @@ func (self *CountRR) Receive(rr dns.RR, wg *sync.WaitGroup) {
 func (self *CountRR) Done() {
 }
 
-func (self *CountRR) Stats() {
-	for rrtype, count := range self.count {
-		fmt.Printf("CountRR\t%-15s\t%7d\n", rrtype, count)
-	}
-}
-
 func (self *CountRR) Influx(tld string, source string) string {
 	line := fmt.Sprintf("CountRR,tld=%s,source=%s ", tld, source)
 	seperator := ""

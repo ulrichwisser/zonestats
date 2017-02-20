@@ -33,10 +33,6 @@ func (self *CountDom) Receive(rr dns.RR, wg *sync.WaitGroup) {
 func (self *CountDom) Done() {
 }
 
-func (self *CountDom) Stats() {
-	fmt.Printf("CountDom\t%7d\n", len(self.count))
-}
-
 func (self *CountDom) Influx(tld string, source string) string {
 	return fmt.Sprintf("CountDom,tld=%s,source=%s value=%di\n", tld, source, len(self.count))
 }
