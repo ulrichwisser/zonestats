@@ -75,6 +75,10 @@ func readConfigFile(filename string) (config *Configuration, error error) {
 func readDefaultConfigFiles() (config *Configuration) {
 
 	// .dzone in current directory
+	usr, err := user.Current()
+	if err != nil {
+		panic(err)
+	}
 	fileconfig, err := readConfigFile(path.Join(usr.HomeDir, ".zonestats"))
 	if err != nil && !os.IsNotExist(err) {
 		panic(err)
@@ -82,10 +86,6 @@ func readDefaultConfigFiles() (config *Configuration) {
 	config = joinConfig(config, fileconfig)
 
 	// .dzone in user home directory
-	usr, err := user.Current()
-	if err != nil {
-		panic(err)
-	}
 	fileconfig, err = readConfigFile(".zonestats")
 	if err != nil && !os.IsNotExist(err) {
 		panic(err)
