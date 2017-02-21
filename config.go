@@ -23,7 +23,6 @@ type Configuration struct {
 	Resolvers    stringslice
 	Port         uint
 	InfluxServer string
-	InfluxPort   string
 	InfluxDB     string
 	InfluxUser   string
 	InfluxPasswd string
@@ -42,7 +41,6 @@ func parseCmdline() *Configuration {
 	flag.UintVar(&config.Port, "port", 53, "port for axfr")
 	flag.Var(&config.Resolvers, "resolver", "resolver name or ip")
 	flag.StringVar(&config.InfluxServer, "influxServer", "", "Server with InfluxDB running")
-	flag.StringVar(&config.InfluxPort, "influxPort", "", "Port used by InfluxDB")
 	flag.StringVar(&config.InfluxDB, "influxDB", "", "Name of InfluxDB database")
 	flag.StringVar(&config.InfluxUser, "influxUser", "", "Name of InfluxDB user")
 	flag.StringVar(&config.InfluxPasswd, "influxPasswd", "", "Name of InfluxDB user password")
@@ -139,11 +137,6 @@ func joinConfig(oldConf *Configuration, newConf *Configuration) (config *Configu
 	} else {
 		config.InfluxServer = oldConf.InfluxServer
 	}
-	if newConf.InfluxPort != "" {
-		config.InfluxPort = newConf.InfluxPort
-	} else {
-		config.InfluxPort = oldConf.InfluxPort
-	}
 	if newConf.InfluxDB != "" {
 		config.InfluxDB = newConf.InfluxDB
 	} else {
@@ -189,6 +182,9 @@ func checkConfiguration(config *Configuration) *Configuration {
 	if len(config.Axfr) > 0 {
 		config.Source = "axfr"
 	}
+	if config.Port == 0 {
+		panic(errors.New("port must be given"))
+	}
 	if len(config.Zone) == 0 {
 		panic(errors.New("zone must be given"))
 	}
@@ -196,10 +192,6 @@ func checkConfiguration(config *Configuration) *Configuration {
 	// Influx config
 	if !config.Dryrun {
 		if len(config.InfluxServer) == 0 {
-			fmt.Println("Influx server address must be given.")
-			usage()
-		}
-		if len(config.InfluxPort) == 0 {
 			fmt.Println("Influx server address must be given.")
 			usage()
 		}

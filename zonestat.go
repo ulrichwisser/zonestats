@@ -2,9 +2,10 @@ package main
 
 import (
 	"bytes"
-	"encoding/base64"
 	"fmt"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"sync"
 
 	"github.com/miekg/dns"
@@ -79,31 +80,46 @@ func donePlugins() {
 }
 
 func runInflux(config *Configuration) {
+
+	// collect line data
 	lines := ""
 	for _, plugin := range plugins {
 		lines = lines + plugin.Influx(config.Zone, config.Source)
 	}
-	if !config.Dryrun {
 
-		req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://%s:%s/write?db=%s", config.InfluxServer, config.InfluxPort, config.InfluxDB), bytes.NewBufferString(lines))
-		if err != nil {
-			panic(err)
-		}
-		if len(config.InfluxUser) > 0 {
-			req.SetBasicAuth(config.InfluxUser, config.InfluxPasswd)
-		}
+	// compute InfluxDB URL
+	sessionurl, err := url.Parse(config.InfluxServer)
+	sessionurl.Path = "write"
+	q := sessionurl.Query()
+	q.Set("db", config.InfluxDB)
+	sessionurl.RawQuery = q.Encode()
+
+	req, err := http.NewRequest(http.MethodPost, sessionurl.String(), bytes.NewBufferString(lines))
+	if err != nil {
+		panic(err)
+	}
+	if len(config.InfluxUser) > 0 {
+		req.SetBasicAuth(config.InfluxUser, config.InfluxPasswd)
+	}
+
+	if !config.Dryrun {
 		_, err = http.DefaultClient.Do(req)
 		if err != nil {
 			panic(err)
 		}
 	} else {
 		fmt.Println("DRYRUN! No actual call to InfluxDB has been made. The following call would have been made without --dryrun")
-		fmt.Printf("http://%s:%s/write?db=%s\n", config.InfluxServer, config.InfluxPort, config.InfluxDB)
-		if len(config.InfluxUser) > 0 {
-			auth := config.InfluxUser + ":" + config.InfluxPasswd
-			fmt.Printf("Authorization: %s\n", base64.StdEncoding.EncodeToString([]byte(auth)))
+		requestDump, err := httputil.DumpRequest(req, true)
+		if err != nil {
+			fmt.Println(err)
 		}
-		fmt.Println(lines)
+		fmt.Println(string(requestDump))
 
+		//		fmt.Printf("http://%s:%s/write?db=%s\n", config.InfluxServer, config.InfluxPort, config.InfluxDB)
+		//		if len(config.InfluxUser) > 0 {
+		//			auth := config.InfluxUser + ":" + config.InfluxPasswd
+		//			fmt.Printf("Authorization: %s\n", base64.StdEncoding.EncodeToString([]byte(auth)))
+		//		}
+		//		fmt.Println(lines)
 	}
 }
