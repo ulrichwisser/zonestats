@@ -75,7 +75,7 @@ func readConfigFile(filename string) (config *Configuration, error error) {
 func readDefaultConfigFiles() (config *Configuration) {
 
 	// .dzone in current directory
-	fileconfig, err := readConfigFile(".zonestats")
+	fileconfig, err := readConfigFile(path.Join(usr.HomeDir, ".zonestats"))
 	if err != nil && !os.IsNotExist(err) {
 		panic(err)
 	}
@@ -86,7 +86,7 @@ func readDefaultConfigFiles() (config *Configuration) {
 	if err != nil {
 		panic(err)
 	}
-	fileconfig, err = readConfigFile(path.Join(usr.HomeDir, ".zonestats"))
+	fileconfig, err = readConfigFile(".zonestats")
 	if err != nil && !os.IsNotExist(err) {
 		panic(err)
 	}
@@ -123,6 +123,11 @@ func joinConfig(oldConf *Configuration, newConf *Configuration) (config *Configu
 		config.Axfr = newConf.Axfr
 	} else {
 		config.Axfr = oldConf.Axfr
+	}
+	if newConf.Port != 0 {
+		config.Port = newConf.Port
+	} else {
+		config.Port = oldConf.Port
 	}
 	if newConf.Zone != "" {
 		config.Zone = newConf.Zone
